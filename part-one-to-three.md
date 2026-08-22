@@ -1,103 +1,122 @@
-Docker Learning Notes
+# Docker Learning Notes
 
 A practical Docker learning guide based on my hands-on practice.
 
-1. What is Docker?
+---
 
-Docker is a platform for packaging and running applications in isolated environments called containers.
+## 1. What is Docker?
+
+Docker is a platform for packaging and running applications in isolated environments called **containers**.
 
 A container contains the application and the dependencies it needs to run.
 
-Basic flow
+### Basic Flow
 
+```text
 Dockerfile
-    ↓ docker build
+    ↓ (docker build)
 Docker Image
-    ↓ docker run
+    ↓ (docker run)
 Docker Container
     ↓
 Running Application
+```
 
-Why Docker?
+### Why Docker?
 
 Without Docker, an application may depend on:
+- Specific Node.js version
+- Specific package versions
+- OS-level dependencies
+- Environment variables
+- Database/services
+- Configuration
 
-Specific Node.js version
+Docker helps make the environment consistent across development, testing, and production.
 
-Specific package versions
+---
 
-OS-level dependencies
+## 2. Docker Image
 
-Environment variables
+An **image** is a read-only template used to create containers.
 
-Database/services
+### View Images
 
-Configuration
-
-Docker helps make the environment more consistent.
-
-2. Docker Image
-
-An image is a read-only template used to create containers.
-
-Example:
-
+```bash
 docker images
+```
 
-Example output:
+**Example Output:**
+```text
+REPOSITORY   TAG       IMAGE ID       CREATED        SIZE
+my-app       latest    a1b2c3d4e5f6   2 hours ago    150MB
+nginx        latest    f5e4d3c2b1a0   1 day ago      187MB
+node         20-alpine 9876543210ab   3 days ago     120MB
+ubuntu       latest    1234567890cd   1 week ago     77.8MB
+```
 
-IMAGE
-my-app:latest
-nginx:latest
-node:20-alpine
-ubuntu:latest
+An image can be used to create multiple containers:
 
-An image can be used to create multiple containers.
-
+```text
               Image
              /     \
             ↓       ↓
       Container A  Container B
+```
 
-Pull an image
+### Pull an Image
 
+```bash
 docker pull nginx:latest
+```
 
-If no tag is specified, Docker normally uses latest.
+> [!NOTE]
+> If no tag is specified, Docker automatically defaults to `latest`.
 
-3. Docker Container
+---
 
-A container is a running or stopped instance created from an image.
+## 3. Docker Container
 
-Example:
+A **container** is a running or stopped instance created from an image.
 
+### Run a Container
+
+```bash
 docker run nginx:latest
+```
 
-List running containers:
+### List Containers
 
-docker ps
+- **List running containers:**
+  ```bash
+  docker ps
+  ```
+- **List all containers (including stopped):**
+  ```bash
+  docker ps -a
+  ```
 
-List all containers:
+### Container States
+- **Created**
+- **Running / Up**
+- **Exited**
 
-docker ps -a
+### Important Relationship
 
-Container states can include:
-
-Created
-Running / Up
-Exited
-
-Important relationship
-
-Image = Template
+```text
+Image     = Template
 Container = Instance created from that template
+```
 
-4. Dockerfile
+---
 
-A Dockerfile contains instructions for building a Docker image.
+## 4. Dockerfile
 
-Example Node.js Dockerfile:
+A **Dockerfile** contains step-by-step instructions for building a Docker image.
 
+### Example Node.js Dockerfile
+
+```dockerfile
 FROM node:20-alpine
 
 WORKDIR /app
@@ -111,627 +130,482 @@ COPY . .
 EXPOSE 5000
 
 CMD ["node", "index.js"]
+```
 
-5. Dockerfile Instructions
+---
 
-FROM
+## 5. Dockerfile Instructions
 
+### `FROM`
+```dockerfile
 FROM node:20-alpine
-
+```
 Defines the base image.
+- `node` → Node.js runtime image
+- `20` → Node.js version
+- `alpine` → Lightweight Linux distribution
 
-Here:
-
-node → Node.js image
-20 → Node.js version
-alpine → lightweight Linux distribution
-
-WORKDIR
-
+### `WORKDIR`
+```dockerfile
 WORKDIR /app
+```
+Sets the working directory inside the container. Subsequent instructions will execute from `/app`.
 
-Sets the working directory inside the image/container.
-
-After this, commands operate from:
-
-/app
-
-COPY
-
+### `COPY`
+```dockerfile
 COPY package*.json ./
+```
+Copies matching package files from the host build context into the working directory.
 
-Copies matching package files from the build context into the current working directory.
-
-Another example:
-
+```dockerfile
 COPY . .
+```
+Copies all project files into the image, respecting `.dockerignore`.
 
-Copies the project files into the image, subject to .dockerignore.
-
-RUN
-
+### `RUN`
+```dockerfile
 RUN npm ci --omit=dev
+```
+Executes commands **at build time** to build the image (e.g., installing dependencies).
 
-Executes a command while building the image.
+> [!IMPORTANT]
+> - `RUN` happens at **build time**.
+> - `npm ci` requires a `package-lock.json` file. If missing, `npm ci` fails.
+> - Running `npm i` creates `package-lock.json`, resolving missing lockfile build failures.
 
-Important:
-
-RUN = build time
-
-It installs dependencies into the image.
-
-npm ci
-
-npm ci expects a package-lock.json (or npm shrinkwrap file).
-
-If there is no lock file, npm ci fails.
-
-A previous build failed for this reason. Running:
-
-npm i
-
-created the lock file, after which the Docker build succeeded.
-
-EXPOSE
-
+### `EXPOSE`
+```dockerfile
 EXPOSE 5000
+```
+Documents that the application listens on container port `5000`. 
+> [!NOTE]
+> `EXPOSE` does not publish the port to the host. Use `-p 5000:5000` with `docker run` to publish it.
 
-Documents that the application listens on container port 5000.
-
-It does not publish the port by itself.
-
-To publish it:
-
-docker run -p 5000:5000 my-app
-
-CMD
-
+### `CMD`
+```dockerfile
 CMD ["node", "index.js"]
+```
+Defines the default command executed when the container **starts**.
 
-Defines the default command executed when the container starts.
+| Instruction | Execution Time | Purpose |
+|---|---|---|
+| `RUN` | **Build time** | Prepares the image (installs packages, compiles code) |
+| `CMD` | **Runtime** | Starts the main container process |
 
-Important:
+---
 
-RUN = build time
-CMD = container startup
+## 6. .dockerignore
 
-6. .dockerignore
+A `.dockerignore` file prevents unnecessary or sensitive files from being copied into the build context.
 
-A .dockerignore prevents unnecessary files from being sent in the Docker build context.
+### Example `.dockerignore`
 
-Example:
-
+```text
 node_modules
 .git
 .env
 npm-debug.log
+```
 
-Do not copy unnecessary or sensitive files into an image.
+---
 
-7. Docker Build
+## 7. Docker Build
 
-Build an image:
+### Build an Image
 
+```bash
 docker build -t my-image .
+```
 
-Meaning:
+**Breakdown:**
+- `docker build`: Command to build image
+- `-t my-image`: Tags/names the image `my-image:latest`
+- `.`: Build context (current directory)
 
-docker build → build an image
--t my-image  → give it the name/tag my-image
-.            → use the current directory as build context
+### Build with a Specific Version Tag
 
-Result:
-
-my-image:latest
-
-Build with a different tag
-
+```bash
 docker build -t my-app:v1 .
+```
 
-8. Build Cache
+---
 
-Docker caches build layers.
+## 8. Build Cache
 
-For example:
+Docker caches each layer during the build process.
 
+```dockerfile
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
+```
 
-If only index.js changes, Docker can reuse the earlier dependency-installation layers.
+If only `index.js` changes, Docker reuses the cached dependency installation layer (`npm ci`), drastically speeding up rebuilds.
 
-This makes rebuilds faster.
+> [!TIP]
+> Always copy dependency files and install packages **before** copying the rest of the source code.
 
-A good Dockerfile order is therefore:
+---
 
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
+## 9. Rebuild After Code Changes
 
-instead of copying the whole project before installing dependencies.
+When source code changes:
 
-9. Rebuild After Code Changes
+1. **Rebuild the image:**
+   ```bash
+   docker build -t my-app .
+   ```
+2. **Run a new container:**
+   ```bash
+   docker run --name my-container -p 5000:5000 my-app
+   ```
 
-When application code changes:
+> [!NOTE]
+> Running containers do **not** automatically update when an image is rebuilt.
 
-docker build -t my-app .
+```text
+Code Change ──> docker build ──> New Image ──> New Container
+```
 
-Then create a new container:
+---
 
-docker run --name my-container -p 5000:5000 my-app
+## 10. Running Containers
 
-An existing container does not automatically switch to a newly built image.
+### Basic Run
 
-Conceptually:
-
-Code change
-    ↓
-docker build
-    ↓
-New image
-    ↓
-New container
-
-10. Running Containers
-
-Basic run
-
+```bash
 docker run nginx:latest
+```
 
-Detached mode
+### Detached Mode (`-d`)
 
+```bash
 docker run -d nginx:latest
+```
+Runs the container in the background.
 
--d means detached mode.
+- ❌ Incorrect: `docker -d nginx:latest`
+- ✅ Correct: `docker run -d nginx:latest`
 
-The container runs in the background.
+### Interactive Mode (`-it`)
 
-Incorrect:
-
-docker -d nginx:latest
-
-Correct:
-
-docker run -d nginx:latest
-
-Interactive mode
-
+```bash
 docker run -it alpine sh
+```
+- `-i`: Interactive (keeps STDIN open)
+- `-t`: Allocates a pseudo-TTY terminal
 
-Meaning:
+---
 
--i → interactive
--t → terminal
+## 11. Container Lifecycle
 
-This opens a shell inside the Alpine container.
+- **Stop container:**
+  ```bash
+  docker stop <container_id_or_name>
+  ```
+  *Example:* `docker stop 69c`
 
-11. Container Lifecycle
+- **Start stopped container:**
+  ```bash
+  docker start <container_id_or_name>
+  ```
 
-Stop
+- **Restart container:**
+  ```bash
+  docker restart <container_id_or_name>
+  ```
 
-docker stop <container>
+- **Remove container:**
+  ```bash
+  docker rm <container_id_or_name>
+  ```
 
-Example:
+- **Force remove running container:**
+  ```bash
+  docker rm -f <container_id_or_name>
+  ```
 
-docker stop 69c
+- **Remove all stopped containers:**
+  ```bash
+  docker container prune
+  ```
 
-Start a stopped container
+---
 
-docker start <container>
+## 12. `--rm` Flag
 
-Restart
-
-docker restart <container>
-
-Remove
-
-docker rm <container>
-
-A running container normally must be stopped before removing it.
-
-Or force remove:
-
-docker rm -f <container>
-
-Remove all stopped containers
-
-docker container prune
-
-Be careful: this removes all stopped containers.
-
-12. --rm
-
-Example:
-
+```bash
 docker run --rm -it alpine sh
+```
+Automatically removes the container when it exits. Useful for temporary or one-off tasks.
 
---rm automatically removes the container after it exits.
+---
 
-Useful for temporary containers.
+## 13. Container Names
 
-13. Container Names
+Assign a custom name with `--name`:
 
-You can give a container a name:
-
+```bash
 docker run --name my-container nginx
+```
 
-The name must be unique.
-
-If the name is already being used:
-
-Conflict. The container name is already in use.
-
-You can either:
-
+If a name conflict occurs:
+```bash
 docker rm my-container
+```
+*(or choose a different container name).*
 
-or choose another name.
+---
 
-14. Logs
+## 14. Container Logs
 
-View container logs:
+- **View logs:**
+  ```bash
+  docker logs <container_id_or_name>
+  ```
+- **Follow logs continuously:**
+  ```bash
+  docker logs -f <container_id_or_name>
+  ```
 
-docker logs <container>
+---
 
-Example:
+## 15. Execute Commands inside a Running Container
 
-docker logs 2d637
+`docker exec` runs commands inside an **active container**.
 
-Follow logs continuously:
+- ❌ **Incorrect (uses image name):**
+  ```bash
+  docker exec my-image:latest sh
+  ```
+- ✅ **Correct (uses container ID/name):**
+  ```bash
+  docker exec -it <container_id_or_name> sh
+  ```
 
-docker logs -f <container>
-
-Logs are useful for debugging application startup and runtime errors.
-
-15. Execute Commands Inside a Running Container
-
-Important distinction:
-
-Image ≠ Container
-
-This is wrong:
-
-docker exec my-image:latest sh
-
-docker exec requires a container, not an image.
-
-Correct:
-
-docker exec -it <container> sh
-
-Example:
-
-docker exec -it 9734 sh
-
-Then you can run:
-
+Inside the container:
+```bash
 ls
 cd /app
 cat file.txt
+```
 
-16. Port Mapping
+---
 
-Suppose the application listens inside the container on:
+## 16. Port Mapping
 
-5000
+Map container ports to host ports using `-p HOST_PORT:CONTAINER_PORT`.
 
-Use:
-
+```bash
 docker run -p 5000:5000 my-app
+```
 
-Format:
+```text
+Windows (localhost:5000) ──> Container Port 5000 ──> Node/Express App
+```
 
--p HOST_PORT:CONTAINER_PORT
+### Port Conflicts
 
-Example:
+If host port 5000 is occupied:
+```text
+Bind for 0.0.0.0:5000 failed: port is already allocated
+```
 
-Windows localhost:5000
-        ↓
-Container:5000
-        ↓
-Node/Express
+**Resolution Options:**
+1. Stop the process/container using port 5000:
+   ```bash
+   docker stop <container_id>
+   ```
+2. Map to a different host port:
+   ```bash
+   docker run -p 5001:5000 my-app
+   ```
 
-Port conflict
+---
 
-If you see:
+## 17. Restart Policies
 
-Bind for 0.0.0.0:5000 failed:
-port is already allocated
+Configure automatic container restarts on failure or system reboot.
 
-another process/container is already using host port 5000.
+### `always`
+```bash
+docker run -d --name always-test --restart always alpine sleep 1d
+```
+Always restarts the container if it stops.
 
-Check:
+### `unless-stopped`
+```bash
+docker run -d --name unless-test --restart unless-stopped alpine sleep 1d
+```
+Restarts the container unless it was manually stopped.
 
-docker ps
+### Summary of Policies
+- `no` (default)
+- `always`
+- `unless-stopped`
+- `on-failure`
 
-Stop the container using the port:
+---
 
-docker stop <container>
+## 18. Restart Count
 
-Or use another host port:
+Check how many times a container has restarted:
 
-docker run -p 5001:5000 my-app
+```bash
+docker inspect restart-always --format '{{.RestartCount}}'
+```
 
-17. Restart Policies
+> [!NOTE]
+> Manually stopping a container does not increment the restart count.
 
-Docker supports restart policies.
+---
 
-always
+## 19. Docker Inspect
 
-docker run -d \
-  --name always-test \
-  --restart always \
-  alpine sleep 1d
+Inspect detailed low-level JSON configuration of Docker objects:
 
-Docker attempts to restart the container when it stops.
+```bash
+docker inspect <container_id_or_name>
+```
 
-unless-stopped
+**Format specific properties:**
+```bash
+docker inspect <container_id_or_name> --format '{{.State.Status}}'
+```
 
-docker run -d \
-  --name unless-test \
-  --restart unless-stopped \
-  alpine sleep 1d
+Useful for checking:
+- Container configuration
+- Network details & IP addresses
+- Mounts (volumes/bind mounts)
+- Environment variables
+- Restart count & policies
 
-This behaves similarly to always, but if you manually stop the container, Docker does not automatically restart it after the Docker daemon restarts.
+---
 
-Common policies
+## 20. Docker Tags
 
-no
-always
-unless-stopped
-on-failure
+Tag an image with another name or version:
 
-18. Restart Count
-
-Check restart count:
-
-docker inspect restart-always \
-  --format '{{.RestartCount}}'
-
-Example:
-
-0
-1
-
-A manually stopped container does not increase the restart count simply because of the manual stop.
-
-19. Docker Inspect
-
-docker inspect provides detailed low-level information about Docker objects.
-
-Example:
-
-docker inspect <container>
-
-You can also format specific information:
-
-docker inspect restart-always \
-  --format '{{.RestartCount}}'
-
-Useful for debugging:
-
-Container configuration
-
-Network information
-
-Mounts
-
-Restart policy
-
-Environment
-
-Runtime details
-
-20. Docker Tags
-
-Tags give an image another name/version.
-
-Example:
-
+```bash
 docker tag nginx:latest nginx:new
+```
 
-Now both can refer to the same underlying image content:
+Both tags point to the same underlying image layers (no duplicate storage used).
 
-nginx:latest
-nginx:new
+---
 
-Tagging does not create an entirely separate copy of the image.
+## 21. Docker Hub
 
-21. Docker Hub
+Push images to Docker Hub registry:
 
-Docker images can be pushed to Docker Hub.
-
-Example:
-
+```bash
 docker push rasel754/node-app:latest
+```
 
-The image name follows:
+**Image naming format:** `USERNAME/REPOSITORY:TAG`
 
-USERNAME/REPOSITORY:TAG
+### Pull & Run from Docker Hub
 
-Example:
-
-rasel754/node-app:latest
-
-Pull an image
-
+```bash
 docker pull rasel754/node-app:latest
+docker run --name node-new -p 5000:5000 rasel754/node-app:latest
+```
 
-Then run it:
+```text
+Local Image ──> docker push ──> Docker Hub ──> docker pull ──> Other Machine ──> docker run
+```
 
-docker run \
-  --name node-new \
-  -p 5000:5000 \
-  rasel754/node-app:latest
+---
 
-Basic Docker Hub workflow:
+## 22. Docker Volumes
 
-Local Image
-    ↓
-docker push
-    ↓
-Docker Hub
-    ↓
-docker pull
-    ↓
-Other Machine
-    ↓
-docker run
+Containers are ephemeral. Data stored inside a container is lost when the container is deleted.
+A **Volume** provides persistent, Docker-managed storage.
 
-22. Docker Volumes
-
-Containers are disposable, so data stored only inside a container can disappear when the container is removed.
-
-A volume provides persistent Docker-managed storage.
-
-List volumes:
-
+```bash
 docker volume ls
-
-Create a volume:
-
 docker volume create my-vol
-
-Inspect:
-
 docker volume inspect my-vol
-
-Remove:
-
 docker volume rm my-vol
-
-Remove unused volumes:
-
 docker volume prune
+```
 
-23. Named Volume
+---
 
-Create:
+## 23. Named Volumes
 
+Create and mount a named volume:
+
+```bash
 docker volume create my-vol
 
-Mount it:
+docker run -it --name vol-demo -v my-vol:/data ubuntu bash
+```
 
-docker run -it \
-  --name vol-demo \
-  -v my-vol:/data \
-  ubuntu bash
-
-Here:
-
-my-vol → Docker volume
-/data  → path inside container
-
-Inside the container:
-
+Inside container:
+```bash
 cd /data
 echo "this is my docker data" > secretMessage.txt
-cat secretMessage.txt
+exit
+```
 
-Exit and remove the container:
-
+Remove container & re-run with new container:
+```bash
 docker rm vol-demo
+docker run -it --name vol-demo -v my-vol:/data ubuntu bash
+cat /data/secretMessage.txt
+```
 
-Create another container using the same volume:
+```text
+Container 1 (writes data) ──> Named Volume ──> Container 1 Removed ──> Container 2 (reads data)
+```
 
-docker run -it \
-  --name vol-demo \
-  -v my-vol:/data \
-  ubuntu bash
+---
 
-The file is still there:
+## 24. Named Volume vs Container
 
-cd /data
-ls
-cat secretMessage.txt
+- **Container:** Application execution environment (disposable)
+- **Volume:** Persistent data storage (survives container removal)
 
-This demonstrates:
+---
 
-Container 1
-    ↓
-writes data
-    ↓
-Named Volume
-    ↓
-Container 1 removed
-    ↓
-Container 2
-    ↓
-same data available
+## 25. Volume Syntax
 
-24. Named Volume vs Container
+Syntax: `-v VOLUME_NAME:CONTAINER_PATH`
 
-Important:
-
-Container = application environment
-Volume    = persistent data
-
-Removing the container does not automatically remove a separately managed named volume.
-
-25. Volume Syntax
-
-Correct:
-
+```bash
 -v my-vol:/data
+```
 
-General format:
+> [!WARNING]
+> Invalid formatting (e.g., `-v my:vol:/data`) results in mount mode errors.
 
--v SOURCE:DESTINATION
+---
 
-For example:
+## 26. Bind Mounts
 
-my-vol:/data
+Bind mounts map a specific host directory directly into the container.
 
-means:
-
-Docker volume "my-vol"
-        ↓
-container "/data"
-
-A malformed command such as:
-
--v my:vol:/data
-
-can be interpreted incorrectly and result in an invalid mount mode error.
-
-26. Bind Mounts
-
-A bind mount maps a real directory/file from the host machine directly into the container.
-
-Example from my practice:
-
+```bash
 docker run -it \
   --name bind-demo \
   -v "${PWD}:/app" \
   -w /app \
   -p 5000:5000 \
   node:20-alpine sh
+```
 
-Here:
+| Feature | Named Volume | Bind Mount |
+|---|---|---|
+| **Storage Location** | Managed by Docker | Specific host directory |
+| **Use Case** | Databases, persistent app data | Live development code sync |
+| **Syntax** | `-v my-vol:/data` | `-v "${PWD}:/app"` |
 
-Windows project folder
-        ↓
-       /app
-inside container
+---
 
-Named volume
+## 27. Bind Mount + Nodemon (Development Workflow)
 
--v my-vol:/data
-
-Docker manages the storage.
-
-Bind mount
-
--v "${PWD}:/app"
-
-You directly mount a host directory.
-
-27. Bind Mount + Nodemon
-
-For development, a bind mount is very useful.
-
-Example:
-
+```bash
 docker run -it \
   --name bind-demo \
   -v "${PWD}:/app" \
@@ -739,424 +613,275 @@ docker run -it \
   -p 5000:5000 \
   node:20-alpine \
   sh -c "npm install -g nodemon && npm install && nodemon --watch /app --legacy-watch index.js"
+```
 
-This gives a development workflow:
+**Live Reloading Flow:**
+```text
+Edit Code on Host ──> Host Directory Updated ──> Bind Mount Syncs ──> Container /app Updates ──> Nodemon Restarts App
+```
 
-Edit code on Windows
-        ↓
-Host folder changes
-        ↓
-Bind mount
-        ↓
-/app changes inside container
-        ↓
-Nodemon detects change
-        ↓
-Node server restarts
+> [!TIP]
+> Use `--legacy-watch` with Nodemon when working across Windows/Docker/WSL file systems.
 
---legacy-watch can help with file watching across Windows/Docker/WSL environments.
+---
 
-28. Environment Variables
+## 28. Environment Variables (`-e`)
 
-Environment variables can configure an application without hardcoding values.
+Pass environment variables at container startup:
 
-Runtime -e
+```bash
+docker run -it --rm -p 5000:5000 -e NODE_ENV=production my-app:latest
+```
 
-Example:
+---
 
-docker run \
-  -it \
-  --rm \
-  -p 5000:5000 \
-  -e NODE_ENV=production \
-  my-app:latest
+## 29. `.env` File (`--env-file`)
 
-Here:
+Load environment variables from a file:
 
-NODE_ENV=production
+```bash
+docker run -it --rm --env-file .env -p 5000:5000 my-app:latest
+```
 
-is provided when the container starts.
-
-29. .env File
-
-Instead of writing many variables manually:
-
-docker run \
-  -it \
-  --rm \
-  --env-file .env \
-  -p 5000:5000 \
-  my-app:latest
-
-Docker reads environment variables from .env and passes them into the container.
-
-Example .env:
-
+**Sample `.env` file:**
+```env
 NODE_ENV=production
 PORT=5000
 API_URL=https://example.com
+```
 
-Do not commit secrets such as passwords/API keys to GitHub.
+> [!CAUTION]
+> Never commit `.env` files with secret keys or credentials to Git. Keep `.env` in `.gitignore`.
 
-Usually:
+---
 
-.env
+## 30. Build Arguments (`ARG`)
 
-should be in .gitignore.
+`ARG` defines variables passed **during image build time**.
 
-30. ARG — Build-Time Variable
-
-Build arguments can be passed during image creation.
-
-Example:
-
-docker build \
-  --build-arg APP_ENV=testing \
-  -t my-app .
-
-Dockerfile:
-
+```dockerfile
 ARG APP_ENV
+```
 
-ARG is primarily a build-time value.
-
-Important:
-
-ARG → build time
-
-It is different from runtime environment variables.
-
-31. ARG vs ENV vs -e
-
-ARG
-
-ARG APP_ENV
-
-Used during image build.
-
+```bash
 docker build --build-arg APP_ENV=testing -t my-app .
+```
 
-ENV
+---
 
-ENV NODE_ENV=production
+## 31. ARG vs ENV vs `-e` vs `--env-file`
 
-Defines an environment variable in the image/container environment.
+| Mechanism | Type | When Used | Source |
+|---|---|---|---|
+| `ARG` | Build variable | Build time | `--build-arg` |
+| `ENV` | Environment variable | Image / Runtime default | `Dockerfile` |
+| `-e` | Environment variable | Runtime override | Command line flag |
+| `--env-file` | Environment variables | Runtime bulk import | File (`.env`) |
 
--e
+---
 
-docker run -e NODE_ENV=production my-app
+## 32. Common Docker Command Mistakes
 
-Provides/overrides an environment variable at runtime.
+| Mistake | Reason | Correct Command |
+|---|---|---|
+| `docker -d nginx` | Missing `run` command | `docker run -d nginx` |
+| `docker remove container` | Keyword is `rm` | `docker rm container` |
+| `docker imeges` | Typo in `images` | `docker images` |
+| `docker exec my-image sh` | `exec` targets container, not image | `docker exec -it <container_id> sh` |
+| `docker run my-container` | `run` targets image, not container | `docker run my-image` |
+| `docker pull` | Image name required | `docker pull nginx:latest` |
 
---env-file
+---
 
-docker run --env-file .env my-app
+## 33. Useful Command Cheat Sheet
 
-Loads multiple runtime environment variables from a file.
+### Images
+```bash
+docker images                       # List images
+docker pull <image>                 # Pull image
+docker build -t <name> .            # Build image
+docker tag <image> <new-name>       # Tag image
+docker push <user>/<repo>:<tag>     # Push to Hub
+docker rmi <image>                  # Remove image
+```
 
-Easy way to remember:
+### Containers
+```bash
+docker ps                           # List running containers
+docker ps -a                        # List all containers
+docker run <image>                  # Run container
+docker run -d <image>               # Run detached
+docker start <container>            # Start container
+docker stop <container>             # Stop container
+docker restart <container>          # Restart container
+docker rm <container>               # Remove container
+docker rm -f <container>            # Force remove container
+docker container prune              # Remove all stopped containers
+```
 
-ARG          → Build
-ENV          → Environment
--e           → Runtime
---env-file   → Runtime from file
+### Debugging
+```bash
+docker logs <container>             # View logs
+docker logs -f <container>          # Follow logs
+docker exec -it <container> sh      # Execute interactive shell
+docker inspect <container>         # Inspect container JSON
+```
 
-32. Common Docker Command Mistakes
+### Volumes
+```bash
+docker volume ls                    # List volumes
+docker volume create <volume>       # Create volume
+docker volume inspect <volume>      # Inspect volume
+docker volume rm <volume>           # Remove volume
+docker volume prune                 # Remove unused volumes
+```
 
-Mistake 1
+### Environment & Network
+```bash
+docker run -e KEY=value <image>     # Pass env variable
+docker run --env-file .env <image>  # Pass env file
+docker run -p 5000:5000 <image>     # Port mapping
+```
 
-docker -d nginx
-
-Wrong.
-
-Correct:
-
-docker run -d nginx
-
-Mistake 2
-
-docker remove <container>
-
-Docker uses:
-
-docker rm <container>
-
-Mistake 3
-
-docker imeges
-
-Correct:
-
-docker images
-
-Mistake 4
-
-docker exec my-image:latest sh
-
-Wrong because exec needs a container.
-
-Correct:
-
-docker exec -it <container> sh
-
-Mistake 5
-
-docker run my-nginx
-
-If my-nginx is a container name rather than an image name, Docker tries to find/pull an image called my-nginx.
-
-Remember:
-
-docker run → IMAGE
-docker exec → CONTAINER
-docker stop → CONTAINER
-docker rm → CONTAINER
-
-Mistake 6
-
-docker pull
-
-docker pull requires an image:
-
-docker pull nginx:latest
-
-33. Useful Command Cheat Sheet
-
-Images
-
-docker images
-docker pull <image>
-docker build -t <name> .
-docker tag <image> <new-name>
-docker push <username>/<repo>:<tag>
-docker rmi <image>
-
-Containers
-
-docker ps
-docker ps -a
-docker run <image>
-docker run -d <image>
-docker start <container>
-docker stop <container>
-docker restart <container>
-docker rm <container>
-docker rm -f <container>
-docker container prune
-
-Debugging
-
-docker logs <container>
-docker logs -f <container>
-docker exec -it <container> sh
-docker inspect <container>
-
-Volumes
-
-docker volume ls
-docker volume create <volume>
-docker volume inspect <volume>
-docker volume rm <volume>
-docker volume prune
-
-Environment
-
-docker run -e KEY=value <image>
-
-docker run --env-file .env <image>
-
-Ports
-
-docker run -p 5000:5000 <image>
-
-Restart policy
-
+### Restart Policy
+```bash
 docker run --restart always <image>
-
 docker run --restart unless-stopped <image>
+```
 
-34. Docker Mental Model
+---
 
-The most important concepts:
+## 34. Docker Mental Model
 
-                Dockerfile
-                    │
-              docker build
-                    ↓
-              Docker Image
-                    │
-               docker run
-                    ↓
-             Docker Container
-                │       │
-                │       └── Environment Variables
-                │
-                ├── Port Mapping
-                │
-                ├── Volumes
-                │
-                └── Logs
+### Core Workflow
 
-And for development:
+```text
+               Dockerfile
+                   │
+             (docker build)
+                   ↓
+             Docker Image
+                   │
+              (docker run)
+                   ↓
+            Docker Container
+               │       │
+               │       └── Environment Variables
+               │
+               ├── Port Mapping (-p)
+               │
+               ├── Volumes (-v)
+               │
+               └── Logs
+```
 
-Host Project
+### Development Workflow
+
+```text
+Host Project Directory
      │
-     │ Bind Mount
+     │ (Bind Mount -v "${PWD}:/app")
      ↓
 Container /app
      │
      ↓
-Nodemon
+Nodemon (Watcher)
      │
      ↓
-Application
+Running Application
+```
 
-35. Important Differences to Memorize
+---
 
-Concept
+## 35. Important Differences to Memorize
 
-Meaning
+| Concept | Meaning |
+|---|---|
+| **Image** | Template used to create containers |
+| **Container** | Running/stopped instance of an image |
+| **Dockerfile** | Instructions for building an image |
+| **`docker build`** | Creates an image from Dockerfile |
+| **`docker run`** | Creates and starts a container from an image |
+| **`RUN`** | Executes command during image build time |
+| **`CMD`** | Default command executed when container starts |
+| **`EXPOSE`** | Documents container port |
+| **`-p`** | Publishes/maps host port to container port |
+| **Volume** | Persistent Docker-managed storage |
+| **Bind mount** | Maps host path directly into container |
+| **`ARG`** | Build-time variable |
+| **`ENV`** | Environment variable |
+| **`-e`** | Runtime environment variable |
+| **`--env-file`** | Loads runtime variables from a file |
+| **`docker logs`** | Shows container stdout/stderr logs |
+| **`docker exec`** | Runs a command inside a running container |
+| **`--rm`** | Automatically removes container after exit |
+| **`--restart always`** | Automatically restarts container if stopped/crashed |
+| **Docker Hub** | Cloud registry for storing/sharing images |
 
-Image
+---
 
-Template used to create containers
+## 36. Recommended Learning Order
 
-Container
-
-Running/stopped instance of an image
-
-Dockerfile
-
-Instructions for building an image
-
-docker build
-
-Creates an image
-
-docker run
-
-Creates and starts a container
-
-RUN
-
-Executes during image build
-
-CMD
-
-Default command when container starts
-
-EXPOSE
-
-Documents container port
-
--p
-
-Publishes/maps host port to container port
-
-Volume
-
-Persistent Docker-managed storage
-
-Bind mount
-
-Maps host path directly into container
-
-ARG
-
-Build-time variable
-
-ENV
-
-Environment variable
-
--e
-
-Runtime environment variable
-
---env-file
-
-Loads runtime variables from a file
-
-docker logs
-
-Shows container logs
-
-docker exec
-
-Runs a command inside a running container
-
---rm
-
-Removes container after it exits
-
---restart always
-
-Automatically restarts according to the policy
-
-Docker Hub
-
-Registry for storing/sharing images
-
-36. Recommended Learning Order
-
-I have learned these topics in roughly this order:
-
+### Completed Topics
 1. Docker basics
 2. Images
 3. Containers
 4. Dockerfile
-5. docker build
-6. docker run
+5. `docker build`
+6. `docker run`
 7. Port mapping
 8. Container lifecycle
 9. Logs
-10. exec
+10. `exec`
 11. Restart policies
 12. Docker Hub
 13. Volumes
 14. Bind mounts
-15. Nodemon/live development
+15. Nodemon / Live development
 16. Environment variables
-17. ARG / ENV / -e
-18. .env / --env-file
+17. `ARG` / `ENV` / `-e`
+18. `.env` / `--env-file`
 19. Build cache and rebuilds
 
-Next useful topics after these would be:
+### Next Topics to Explore
+- Docker Compose
+- Docker Networking
+- Multi-container Applications
+- MongoDB + Node.js with Docker
+- Dockerfile Optimization
+- Multi-stage Builds
+- Docker Security Basics
+- Docker Image Cleanup
+- Production Docker Practices
 
-Docker Compose
-Docker networking
-Multi-container applications
-MongoDB + Node.js with Docker
-Dockerfile optimization
-Multi-stage builds
-Docker security basics
-Docker image cleanup
-Production Docker practices
+---
 
-Quick Memory Rules
+### Quick Memory Rules
 
+```text
 IMAGE      = Template
 CONTAINER  = Instance
-VOLUME     = Persistent data
-BIND MOUNT = Host folder ↔ Container folder
+VOLUME     = Persistent Data
+BIND MOUNT = Host Directory ↔ Container Directory
 
-BUILD      = Image creation
-RUN        = Build-time command
-CMD        = Startup command
+BUILD      = Image Creation
+RUN        = Build-time Command
+CMD        = Startup Command
 
-ARG        = Build-time variable
-ENV        = Environment variable
--e         = Runtime variable
-.env       = Runtime variables from file
+ARG        = Build-time Variable
+ENV        = Environment Variable
+-e         = Runtime Variable
+.env       = Runtime Variables from File
 
--p         = Port mapping
--v         = Volume / bind mount
--d         = Detached
--it        = Interactive terminal
---rm       = Remove after exit
+-p         = Port Mapping
+-v         = Volume / Bind Mount
+-d         = Detached Mode
+-it        = Interactive Terminal
+--rm       = Remove After Exit
 
-docker run     → IMAGE
-docker exec    → CONTAINER
-docker stop    → CONTAINER
-docker rm      → CONTAINER
-docker rmi     → IMAGE
+docker run  → IMAGE
+docker exec → CONTAINER
+docker stop → CONTAINER
+docker rm   → CONTAINER
+docker rmi  → IMAGE
+```
